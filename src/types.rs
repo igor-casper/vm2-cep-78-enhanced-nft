@@ -1,10 +1,88 @@
+use std::collections::BTreeMap;
+
 use borsh::{BorshDeserialize, BorshSerialize};
 use casper_macros::CasperABI;
-use casper_sdk::{host::Entity, types::Address};
+use casper_sdk::{collections::Map, host::Entity, types::Address};
+use serde::{Deserialize, Serialize};
 
-use crate::error::NFTCoreError;
+// Metadata mutability is different from schema mutability.
+#[derive(Serialize, Deserialize, BorshSerialize, BorshDeserialize, CasperABI, Debug, Clone)]
+pub(crate) struct MetadataSchemaProperty {
+    pub name: String,
+    pub description: String,
+    pub required: bool,
+}
 
-const MAX_TOTAL_TOKEN_SUPPLY: u64 = 100_000_000;
+#[derive(Serialize, Deserialize, BorshSerialize, BorshDeserialize, CasperABI, Debug, Clone)]
+pub(crate) struct CustomMetadataSchema {
+    pub properties: BTreeMap<String, MetadataSchemaProperty>,
+}
+
+// Using a structure for the purposes of serialization formatting.
+#[derive(Serialize, Deserialize, BorshSerialize, BorshDeserialize, CasperABI, Debug, Clone)]
+pub(crate) struct MetadataNFT721 {
+    pub name: String,
+    pub symbol: String,
+    pub token_uri: String,
+}
+
+#[derive(Serialize, Deserialize, BorshSerialize, BorshDeserialize, CasperABI, Debug, Clone)]
+pub(crate) struct MetadataCEP78 {
+    pub name: String,
+    pub token_uri: String,
+    pub checksum: String,
+}
+
+// Using a structure for the purposes of serialization formatting.
+#[derive(Serialize, Deserialize, BorshSerialize, BorshDeserialize, CasperABI, Debug, Clone)]
+pub(crate) struct CustomMetadata {
+    pub attributes: BTreeMap<String, String>,
+}
+
+#[derive(BorshSerialize, BorshDeserialize, CasperABI, Debug, Clone)]
+pub struct StateStore {
+    pub operators: Map<Entity, Vec<Entity>>,
+    pub approved: Map<TokenIdentifier, Entity>,
+    pub balances: Map<Entity, u64>,
+    pub whitelist: Map<Entity, bool>,
+    pub metadata: Map<TokenIdentifier, String>,
+    pub issuers: Map<TokenIdentifier, Entity>,
+    pub owners: Map<TokenIdentifier, Entity>,
+    pub hash_by_index: Map<u64, String>,
+    pub index_by_hash: Map<String, u64>,
+    pub burned_tokens: Vec<TokenIdentifier>,
+    pub json_schema: Option<String>,
+}
+
+impl Default for StateStore {
+    fn default() -> Self {
+        let operators = Map::new("STORE_OPERATORS");
+        let approved = Map::new("STORE_APPROVED");
+        let balances = Map::new("STORE_BALANCES"); 
+        let whitelist = Map::new("STORE_WHITELIST");
+        let metadata = Map::new("STORE_METADATA");
+        let issuers = Map::new("STORE_ISSUERS");
+        let owners = Map::new("STORE_OWNERS");
+        let hash_by_index = Map::new("STORE_HASH_BY_INDEX");
+        let index_by_hash = Map::new("STORE_INDEX_BY_HASH");
+        let burned_tokens = Vec::new();
+        let json_schema = None;
+
+        Self {
+            operators,
+            approved,
+            balances,
+            whitelist,
+            metadata,
+            issuers,
+            owners,
+            hash_by_index,
+            index_by_hash,
+            burned_tokens,
+            json_schema,
+        }
+    }
+}
 
 #[derive(BorshSerialize, BorshDeserialize, CasperABI, Debug, Clone)]
 pub struct CEP78State {
@@ -31,9 +109,9 @@ pub struct CEP78State {
     pub minted_tokens_count: u64,
     pub owned_tokens_count: u64,
     pub burn_mode: BurnMode,
-    pub operator_burn_mode: bool
-    // pub reporting_mode: OwnerReverseLookupMode,
-    // pub transfer_filter_contract_contract_hash: Option<Address>,
+    pub operator_burn_mode: bool,
+
+    pub store: StateStore
 }
 
 #[derive(BorshSerialize, BorshDeserialize, CasperABI, Debug, Clone, PartialEq)]
