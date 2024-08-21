@@ -233,8 +233,8 @@ impl NFTContract {
 
         // The contract's ownership behavior (determined at installation) determines,
         // who owns the NFT we are about to mint.()
-        self.insert_token_owner(&token_identifier, &token_owner);
-        self.insert_token_issuer(&token_identifier, &token_owner);
+        self.insert_token_owner(&token_identifier, token_owner);
+        self.insert_token_issuer(&token_identifier, token_owner);
 
         // Update the forward and reverse trackers
         if NFTIdentifierMode::Hash == self.state.identifier_mode {
@@ -588,7 +588,7 @@ impl NFTContract {
         if self.read_token_owner(&token_identifier) != Some(source_owner) {
             return Err(NFTCoreError::InvalidTokenOwner);
         }
-        self.insert_token_owner(&token_identifier, &target_owner);
+        self.insert_token_owner(&token_identifier, target_owner);
 
         // Update the from_account balance
         match self.get_token_balance(source_owner) {
@@ -677,11 +677,13 @@ impl NFTContract {
         caller: Entity,
         owner: Entity
     ) -> bool {
-        let Some(operators) = self.state.store.operators.get(&owner) else {
-            return false
-        };
+        for entry in &self.state.store.operators {
+            if entry.key == owner && entry.value == caller {
+                return true;
+            }
+        }
 
-        operators.contains(&caller)
+        return false;
     }
 
     fn set_operator_for_owner(
@@ -690,26 +692,38 @@ impl NFTContract {
         operator: Entity,
         value: bool
     ) {
-        let mut operators = match self.state.store.operators.get(&owner) {
-            Some(operators) => operators,
-            None => {
-                self.state.store.operators.insert(&owner, &Vec::new());
-                self.state.store.operators.get(&owner).unwrap()
-            }
-        };
+        if value == false {
+            self.state.store.operators.retain(|entry| {
+                let owned = entry.key == owner;
+                let is_operator = entry.value == operator;
+                let operator_for_owner = owned && is_operator;
+                !operator_for_owner
+            });
+            return;
+        }
 
-        match (operators.contains(&operator), value) {
-            (true, false) => operators.retain(|&x| x != operator),
-            (false, true) => operators.push(operator),
-            _ => {}
-        };
+        for entry in &self.state.store.operators {
+            let owned = entry.key == owner;
+            let is_operator = entry.value == operator;
+            let operator_for_owner = owned && is_operator;
+            if operator_for_owner {
+                return;
+            }
+        }
+
+        self.state.store.operators.push(OperatorEntry { 
+            key: owner,
+            value: operator
+        });
     }
 
     fn clear_approved(
         &mut self,
         token_identifier: &TokenIdentifier
     ) -> Result<(), NFTCoreError> {
-        self.state.store.approved.get(&token_identifier).take();
+        if let Some(mut data) = self.state.store.data.get(token_identifier) {
+            data.approved = None;
+        }
         Ok(())
     }
 
@@ -718,7 +732,12 @@ impl NFTContract {
         token_identifier: &TokenIdentifier,
         entity: Entity
     ) -> Result<(), NFTCoreError> {
-        self.state.store.approved.insert(&token_identifier, &entity);
+        if let Some(mut data) = self.state.store.data.get(token_identifier) {
+            data.approved = Some(entity);
+        } else {
+            return Err(NFTCoreError::InvalidTokenIdentifier);
+        }
+
         Ok(())
     }
 
@@ -726,7 +745,11 @@ impl NFTContract {
         &mut self,
         token_identifier: &TokenIdentifier
     ) -> Result<Option<Entity>, NFTCoreError> {
-        Ok(self.state.store.approved.get(&token_identifier))
+        if let Some(data) = self.state.store.data.get(token_identifier) {
+            Ok(data.approved)
+        } else {
+            Err(NFTCoreError::InvalidTokenIdentifier)
+        }
     }
 
     fn set_token_balance(
@@ -734,11 +757,20 @@ impl NFTContract {
         owner: Entity,
         count: u64
     ) -> Result<(), NFTCoreError> {
-        Ok(self.state.store.balances.insert(&owner, &count))
+        if let Some(mut data) = self.state.store.entity_data.get(&owner) {
+            data.balance = count;
+            Ok(())
+        } else {
+            Err(NFTCoreError::InvalidTokenIdentifier)
+        }
     }
 
     fn get_token_balance(&self, owner: Entity) -> Option<u64> {
-        self.state.store.balances.get(&owner)
+        if let Some(data) = self.state.store.entity_data.get(&owner) {
+            Some(data.balance)
+        } else {
+            None
+        }
     }
 
     fn set_token_burned(&mut self, token_identifier: TokenIdentifier) {
@@ -751,11 +783,15 @@ impl NFTContract {
 
     // Check if caller is operator to execute burn
     fn read_operator(&self, owner: Entity, caller: Entity) -> bool {
-        let Some(operators) = self.state.store.operators.get(&owner) else {
-            return false
-        };
-
-        operators.contains(&caller)
+        for entry in &self.state.store.operators {
+            let owned = entry.key == owner;
+            let is_operator = entry.value == caller;
+            let operator_for_owner = owned && is_operator;
+            if operator_for_owner {
+                return true;
+            }
+        }
+        false
     }
 
     fn insert_hash_id_lookups(
@@ -791,24 +827,40 @@ impl NFTContract {
     fn insert_token_issuer(
         &mut self,
         token_identifier: &TokenIdentifier,
-        issuer: &Entity
+        issuer: Entity
     ) {
-        self.state.store.issuers.insert(token_identifier, issuer);
+        if let Some(mut data) = self.state.store.data.get(&token_identifier) {
+            data.issuer = Some(issuer);
+        } else {
+            let mut data = TokenData::default();
+            data.issuer = Some(issuer);
+            self.state.store.data.insert(&token_identifier, &data);
+        }
     }
 
     fn read_token_owner(
         &self,
         token_identifier: &TokenIdentifier
     ) -> Option<Entity> {
-        self.state.store.owners.get(token_identifier)
+        if let Some(data) = self.state.store.data.get(&token_identifier) {
+            data.owner
+        } else {
+            None
+        }
     }
 
     fn insert_token_owner(
         &mut self,
         token_identifier: &TokenIdentifier,
-        owner: &Entity
+        owner: Entity
     ) {
-        self.state.store.owners.insert(token_identifier, owner);
+        if let Some(mut data) = self.state.store.data.get(&token_identifier) {
+            data.owner = Some(owner);
+        } else {
+            let mut data = TokenData::default();
+            data.owner = Some(owner);
+            self.state.store.data.insert(&token_identifier, &data);
+        }
     }
 
     fn validate_metadata(
@@ -957,11 +1009,17 @@ impl NFTContract {
     }
 
     fn is_whitelisted(&self, key: Entity) -> bool {
-        self.state.store.whitelist.get(&key).unwrap_or_default()
+        if let Some(data) = self.state.store.entity_data.get(&key) {
+            data.whitelisted
+        } else {
+            false
+        }
     }
 
     fn insert_acl_entry(&mut self, key: Entity, access: bool) {
-        self.state.store.whitelist.insert(&key, &access);                                                
+        if let Some(mut data) = self.state.store.entity_data.get(&key) {
+            data.whitelisted = access;
+        }
     }
 
     // TODO: implement events

@@ -39,30 +39,48 @@ pub(crate) struct CustomMetadata {
     pub attributes: BTreeMap<String, String>,
 }
 
+// VM2 doesn't support nested containers, so Map<E, Vec<E>> is
+// not really possible - this is a workaround around this issue.
+// Just store Vec<{E, E}> instead of Map<E, Vec<E>>. This makes
+// some data redundant, but it's the best we can do for now.
+#[derive(BorshSerialize, BorshDeserialize, CasperABI, Debug, Clone)]
+pub struct OperatorEntry {
+    pub key: Entity,
+    pub value: Entity
+}
+
+#[derive(BorshSerialize, BorshDeserialize, CasperABI, Default, Debug, Clone)]
+pub struct TokenData {
+    pub approved: Option<Entity>,
+    pub issuer: Option<Entity>,
+    pub owner: Option<Entity>,
+    pub metadata: String
+}
+
+#[derive(BorshSerialize, BorshDeserialize, CasperABI, Debug, Clone)]
+pub struct EntityData {
+    pub balance: u64,
+    pub whitelisted: bool
+}
+
 #[derive(BorshSerialize, BorshDeserialize, CasperABI, Debug, Clone)]
 pub struct StateStore {
-    pub operators: Map<Entity, Vec<Entity>>,
-    pub approved: Map<TokenIdentifier, Entity>,
-    pub balances: Map<Entity, u64>,
-    pub whitelist: Map<Entity, bool>,
-    pub metadata: Map<TokenIdentifier, String>,
-    pub issuers: Map<TokenIdentifier, Entity>,
-    pub owners: Map<TokenIdentifier, Entity>,
+    pub operators: Vec<OperatorEntry>,
+    pub entity_data: Map<Entity, EntityData>,
+    pub data: Map<TokenIdentifier, TokenData>,
     pub hash_by_index: Map<u64, String>,
     pub index_by_hash: Map<String, u64>,
     pub burned_tokens: Vec<TokenIdentifier>,
     pub json_schema: Option<String>,
+    pub metadata: Map<TokenIdentifier, String>,
 }
 
 impl Default for StateStore {
     fn default() -> Self {
-        let operators = Map::new("STORE_OPERATORS");
-        let approved = Map::new("STORE_APPROVED");
-        let balances = Map::new("STORE_BALANCES"); 
-        let whitelist = Map::new("STORE_WHITELIST");
+        let operators = Vec::new();
+        let entity_data = Map::new("ENTITY_DATA");
+        let data = Map::new("TOKEN_DATA");
         let metadata = Map::new("STORE_METADATA");
-        let issuers = Map::new("STORE_ISSUERS");
-        let owners = Map::new("STORE_OWNERS");
         let hash_by_index = Map::new("STORE_HASH_BY_INDEX");
         let index_by_hash = Map::new("STORE_INDEX_BY_HASH");
         let burned_tokens = Vec::new();
@@ -70,12 +88,9 @@ impl Default for StateStore {
 
         Self {
             operators,
-            approved,
-            balances,
-            whitelist,
+            entity_data,
+            data,
             metadata,
-            issuers,
-            owners,
             hash_by_index,
             index_by_hash,
             burned_tokens,
