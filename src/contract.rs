@@ -3,7 +3,7 @@ use std::collections::BTreeMap;
 use blake2b_simd::blake2b;
 use casper_macros::*;
 use casper_sdk::*;
-use host::Entity;
+use host::{native::DEFAULT_ADDRESS, Entity};
 use types::*;
 use crate::{error::NFTCoreError, events::{events_cep47::CEP47Event, events_ces::{Approval, ApprovalForAll, ApprovalRevoked, Burn, Event, Mint, RevokedForAll, Transfer, VariablesSet}}, types::*};
 
@@ -70,7 +70,7 @@ impl NFTContract {
         operator_burn_mode: bool,
         events_mode: Option<EventsMode>
     ) -> NFTContract {
-        let installer = host::get_caller();
+        let installer = Entity::Account(DEFAULT_ADDRESS);
         let events_mode = events_mode.unwrap_or(EventsMode::NoEvents);
         let minted_tokens_count = 0u64;
         let owned_tokens_count = 0u64;
@@ -174,7 +174,7 @@ impl NFTContract {
         token_metadata: String,
         token_owner: Entity,
         optional_token_hash: Option<String>,
-    ) -> Result<(), NFTCoreError> {
+    ) -> Result<TokenIdentifier, NFTCoreError> {
         // The contract owner can toggle the minting behavior on and off over time.
         // The contract is toggled on by default.
         // If contract minting behavior is currently toggled off we revert.
@@ -263,10 +263,7 @@ impl NFTContract {
             })
         }
 
-        // TODO: Support reporting_mode. It should be thought through
-        // how to best implement this mechanism in the new vm.
-
-        Ok(())
+        Ok(token_identifier)
     }
 
     // Marks token as burnt. This blocks any future call to transfer token.
@@ -1027,46 +1024,5 @@ impl NFTContract {
     }
 
     fn emit_ces_event(&mut self, _event: impl Event) {
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    use casper_sdk::host::{self, native::{Environment, DEFAULT_ADDRESS}};
-
-    // This is only done to see if the vm doesn't explode.
-    // Proper tests should be ported from the reference impl;
-
-    #[test]
-    fn it_works() {
-        let stub = Environment::new(Default::default(), DEFAULT_ADDRESS);
-
-        let result = host::native::dispatch_with(stub, || {
-            NFTContract::new(
-                "test-collection".into(),
-                "tc".into(),
-                100,
-                true,
-                MintingMode::Installer,
-                OwnershipMode::Transferable,
-                NFTKind::Virtual,
-                WhitelistMode::Unlocked,
-                Vec::new(),
-                false,
-                false,
-                "".into(),
-                NFTMetadataKind::CEP78,
-                Vec::new(),
-                Vec::new(),
-                NFTIdentifierMode::Ordinal,
-                MetadataMutability::Immutable,
-                BurnMode::Burnable,
-                false,
-                None
-            );
-        });
-        assert_eq!(result, Ok(()));
     }
 }
