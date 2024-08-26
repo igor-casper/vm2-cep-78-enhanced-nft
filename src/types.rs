@@ -57,7 +57,7 @@ pub struct TokenData {
     pub metadata: String
 }
 
-#[derive(BorshSerialize, BorshDeserialize, CasperABI, Debug, Clone)]
+#[derive(BorshSerialize, BorshDeserialize, CasperABI, Default, Debug, Clone)]
 pub struct EntityData {
     pub balance: u64,
     pub whitelisted: bool
@@ -122,7 +122,6 @@ pub struct CEP78State {
     pub installer: Entity,
     pub events_mode: EventsMode,
     pub minted_tokens_count: u64,
-    pub owned_tokens_count: u64,
     pub burn_mode: BurnMode,
     pub operator_burn_mode: bool,
 

@@ -3,7 +3,7 @@ use std::collections::BTreeMap;
 use blake2b_simd::blake2b;
 use casper_macros::*;
 use casper_sdk::*;
-use host::{native::DEFAULT_ADDRESS, Entity};
+use host::Entity;
 use types::*;
 use crate::{error::NFTCoreError, events::{events_cep47::CEP47Event, events_ces::{Approval, ApprovalForAll, ApprovalRevoked, Burn, Event, Mint, RevokedForAll, Transfer, VariablesSet}}, types::*};
 
@@ -37,7 +37,6 @@ impl Default for NFTContract {
             installer: Entity::Account([0;32]),
             events_mode: EventsMode::NoEvents,
             minted_tokens_count: 0,
-            owned_tokens_count: 0,
             store: Default::default()
         };
 
@@ -70,10 +69,9 @@ impl NFTContract {
         operator_burn_mode: bool,
         events_mode: Option<EventsMode>
     ) -> NFTContract {
-        let installer = Entity::Account(DEFAULT_ADDRESS);
+        let installer = host::get_caller();
         let events_mode = events_mode.unwrap_or(EventsMode::NoEvents);
         let minted_tokens_count = 0u64;
-        let owned_tokens_count = 0u64;
         let store = StateStore::default();
 
         let state = CEP78State {
@@ -97,7 +95,6 @@ impl NFTContract {
             burn_mode,
             operator_burn_mode,
             minted_tokens_count,
-            owned_tokens_count,
             events_mode,
             installer,
             store
@@ -244,7 +241,8 @@ impl NFTContract {
         }
 
         // Increment the count of owned tokens.
-        self.state.owned_tokens_count += 1;
+        let current_balance = self.get_token_balance(token_owner);
+        self.set_token_balance(token_owner, current_balance + 1);
         
         // Increment number_of_minted_tokens by one
         self.state.minted_tokens_count += 1;
@@ -302,20 +300,19 @@ impl NFTContract {
 
         self.set_token_burned(token_identifier.clone());
 
-        let updated_balance = match self.get_token_balance(token_owner) {
-            Some(balance) => {
+        let balance = self.get_token_balance(token_owner);
+        let updated_balance = match balance {
+            0 => return Err(NFTCoreError::FatalTokenIdDuplication),
+            _ => {
                 if balance > 0u64 {
                     balance - 1u64
                 } else {
                     return Err(NFTCoreError::FatalTokenIdDuplication)
                 }
             },
-            None => return Err(NFTCoreError::FatalTokenIdDuplication)
         };
 
-        if let Err(e) = self.set_token_balance(token_owner, updated_balance) {
-            return Err(e);
-        }
+        self.set_token_balance(token_owner, updated_balance);
 
         // Emit Burn event
         match self.state.events_mode {
@@ -588,8 +585,10 @@ impl NFTContract {
         self.insert_token_owner(&token_identifier, target_owner);
 
         // Update the from_account balance
-        match self.get_token_balance(source_owner) {
-            Some(balance) => {
+        let balance = self.get_token_balance(source_owner);
+        match balance {
+            0 => return Err(NFTCoreError::FatalTokenIdDuplication),
+            _ => {
                 self.set_token_balance(
                     source_owner,
                     if balance > 0u64 {
@@ -598,17 +597,13 @@ impl NFTContract {
                         // This should never happen...
                         return Err(NFTCoreError::FatalTokenIdDuplication)
                     }
-                ).unwrap();
+                );
             },
-            None => return Err(NFTCoreError::FatalTokenIdDuplication),
         }
 
         // Update the to_account balance
-        let updated_to_account_balance = match self.get_token_balance(target_owner) {
-            Some(balance) => balance + 1u64,
-            None => 1u64
-        };
-        self.set_token_balance(target_owner, updated_to_account_balance).ok();
+        let updated_to_account_balance = self.get_token_balance(target_owner) + 1u64;
+        self.set_token_balance(target_owner, updated_to_account_balance);
         self.clear_approved(&token_identifier).ok();
 
         match self.state.events_mode {
@@ -636,7 +631,7 @@ impl NFTContract {
         &self,
         owner: Entity,
     ) -> Result<u64, NFTCoreError> {
-        let balance = self.get_token_balance(owner).unwrap_or(0);
+        let balance = self.get_token_balance(owner);
         Ok(balance)
     }
 
@@ -753,20 +748,17 @@ impl NFTContract {
         &mut self,
         owner: Entity,
         count: u64
-    ) -> Result<(), NFTCoreError> {
-        if let Some(mut data) = self.state.store.entity_data.get(&owner) {
-            data.balance = count;
-            Ok(())
-        } else {
-            Err(NFTCoreError::InvalidTokenIdentifier)
-        }
+    ) {
+        let mut data = self.state.store.entity_data.get(&owner).unwrap_or_default();
+        data.balance = count;
+        self.state.store.entity_data.insert(&owner, &data);
     }
 
-    fn get_token_balance(&self, owner: Entity) -> Option<u64> {
+    fn get_token_balance(&self, owner: Entity) -> u64 {
         if let Some(data) = self.state.store.entity_data.get(&owner) {
-            Some(data.balance)
+            data.balance
         } else {
-            None
+            0
         }
     }
 

@@ -8,8 +8,8 @@ edition = "2021"
 crate-type = ["lib", "cdylib"]
 
 [dependencies]
-casper-macros = { git = "https://github.com/mpapierski/casper-node", branch = "vm2" }
-casper-sdk = { git = "https://github.com/mpapierski/casper-node", branch = "vm2" }
+casper-macros = { git = "https://github.com/mpapierski/casper-node", branch = "new-execution-engine" }
+casper-sdk = { git = "https://github.com/mpapierski/casper-node", branch = "new-execution-engine" }
 borsh = { version = "1.2.0", features = ["derive", "unstable__schema"] }
 base16 = { version = "0.2.1", default-features = false, features = ["alloc"] }
 serde = { version = "1.0.80", default-features = false }
