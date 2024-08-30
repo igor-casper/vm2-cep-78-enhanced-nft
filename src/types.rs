@@ -46,7 +46,7 @@ pub(crate) struct CustomMetadata {
 #[derive(BorshSerialize, BorshDeserialize, CasperABI, Debug, Clone)]
 pub struct OperatorEntry {
     pub key: Entity,
-    pub value: Entity
+    pub value: Entity,
 }
 
 #[derive(BorshSerialize, BorshDeserialize, CasperABI, Default, Debug, Clone)]
@@ -54,13 +54,13 @@ pub struct TokenData {
     pub approved: Option<Entity>,
     pub issuer: Option<Entity>,
     pub owner: Option<Entity>,
-    pub metadata: String
+    pub metadata: String,
 }
 
 #[derive(BorshSerialize, BorshDeserialize, CasperABI, Default, Debug, Clone)]
 pub struct EntityData {
     pub balance: u64,
-    pub whitelisted: bool
+    pub whitelisted: bool,
 }
 
 #[derive(BorshSerialize, BorshDeserialize, CasperABI, Debug, Clone)]
@@ -125,18 +125,18 @@ pub struct CEP78State {
     pub burn_mode: BurnMode,
     pub operator_burn_mode: bool,
 
-    pub store: StateStore
+    pub store: StateStore,
 }
 
 #[derive(BorshSerialize, BorshDeserialize, CasperABI, Debug, Clone, PartialEq)]
-#[borsh(use_discriminant=true)]
+#[borsh(use_discriminant = true)]
 pub enum NFTIdentifierMode {
     Ordinal = 0,
     Hash = 1,
 }
 
 #[derive(BorshSerialize, BorshDeserialize, CasperABI, Debug, Clone, PartialEq)]
-#[borsh(use_discriminant=true)]
+#[borsh(use_discriminant = true)]
 pub enum EventsMode {
     NoEvents = 0,
     CEP47 = 1,
@@ -144,21 +144,21 @@ pub enum EventsMode {
 }
 
 #[derive(BorshSerialize, BorshDeserialize, CasperABI, Debug, Clone, PartialEq)]
-#[borsh(use_discriminant=true)]
+#[borsh(use_discriminant = true)]
 pub enum MetadataMutability {
     Immutable = 0,
     Mutable = 1,
 }
 
 #[derive(BorshSerialize, BorshDeserialize, CasperABI, Debug, Clone, PartialEq)]
-#[borsh(use_discriminant=true)]
+#[borsh(use_discriminant = true)]
 pub enum BurnMode {
     Burnable = 0,
     NonBurnable = 1,
 }
 
 #[derive(BorshSerialize, BorshDeserialize, CasperABI, Debug, Clone, PartialEq)]
-#[borsh(use_discriminant=true)]
+#[borsh(use_discriminant = true)]
 pub enum OwnerReverseLookupMode {
     NoLookUp = 0,
     Complete = 1,
@@ -166,7 +166,7 @@ pub enum OwnerReverseLookupMode {
 }
 
 #[derive(BorshSerialize, BorshDeserialize, CasperABI, Debug, Clone, PartialEq)]
-#[borsh(use_discriminant=true)]
+#[borsh(use_discriminant = true)]
 pub enum NFTMetadataKind {
     CEP78 = 0,
     NFT721 = 1,
@@ -175,7 +175,7 @@ pub enum NFTMetadataKind {
 }
 
 #[derive(BorshSerialize, BorshDeserialize, CasperABI, Debug, Clone, PartialEq)]
-#[borsh(use_discriminant=true)]
+#[borsh(use_discriminant = true)]
 pub enum MintingMode {
     Installer = 0,
     /// The ability to mint NFTs is not restricted.
@@ -185,7 +185,7 @@ pub enum MintingMode {
 }
 
 #[derive(BorshSerialize, BorshDeserialize, CasperABI, Debug, Clone, PartialEq)]
-#[borsh(use_discriminant=true)]
+#[borsh(use_discriminant = true)]
 pub enum OwnershipMode {
     /// The minter owns it and can never transfer it.
     Minter = 0,
@@ -196,7 +196,7 @@ pub enum OwnershipMode {
 }
 
 #[derive(BorshSerialize, BorshDeserialize, CasperABI, Debug, Clone, PartialEq)]
-#[borsh(use_discriminant=true)]
+#[borsh(use_discriminant = true)]
 pub enum NFTKind {
     /// The NFT represents a real-world physical
     /// like a house.
@@ -211,7 +211,7 @@ pub enum NFTKind {
 }
 
 #[derive(BorshSerialize, BorshDeserialize, CasperABI, Debug, Clone, PartialEq)]
-#[borsh(use_discriminant=true)]
+#[borsh(use_discriminant = true)]
 pub enum NFTHolderMode {
     Accounts = 0,
     Contracts = 1,
@@ -219,7 +219,7 @@ pub enum NFTHolderMode {
 }
 
 #[derive(BorshSerialize, BorshDeserialize, CasperABI, Debug, Clone, PartialEq)]
-#[borsh(use_discriminant=true)]
+#[borsh(use_discriminant = true)]
 pub enum WhitelistMode {
     Unlocked = 0,
     Locked = 1,
@@ -228,7 +228,7 @@ pub enum WhitelistMode {
 #[derive(BorshSerialize, BorshDeserialize, CasperABI, Debug, Clone, PartialEq)]
 pub enum TokenIdentifier {
     Ordinal(u64),
-    Hash(String)
+    Hash(String),
 }
 
 impl TokenIdentifier {

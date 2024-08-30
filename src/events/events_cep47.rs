@@ -5,7 +5,7 @@ use casper_sdk::{host::Entity, types::Address};
 use crate::types::TokenIdentifier;
 
 #[derive(BorshSerialize, BorshDeserialize, CasperABI, Debug, Clone, PartialEq)]
-#[borsh(use_discriminant=true)]
+#[borsh(use_discriminant = true)]
 pub enum CEP47Event {
     Mint {
         recipient: Address,

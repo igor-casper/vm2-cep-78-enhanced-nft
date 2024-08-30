@@ -1,11 +1,21 @@
 use std::collections::BTreeMap;
 
+use crate::{
+    error::NFTCoreError,
+    events::{
+        events_cep47::CEP47Event,
+        events_ces::{
+            Approval, ApprovalForAll, ApprovalRevoked, Burn, Event, Mint, RevokedForAll, Transfer,
+            VariablesSet,
+        },
+    },
+    types::*,
+};
 use blake2b_simd::blake2b;
 use casper_macros::*;
 use casper_sdk::*;
 use host::Entity;
 use types::*;
-use crate::{error::NFTCoreError, events::{events_cep47::CEP47Event, events_ces::{Approval, ApprovalForAll, ApprovalRevoked, Burn, Event, Mint, RevokedForAll, Transfer, VariablesSet}}, types::*};
 
 #[casper(contract_state)]
 pub struct NFTContract {
@@ -34,10 +44,10 @@ impl Default for NFTContract {
             metadata_mutability: MetadataMutability::Immutable,
             burn_mode: BurnMode::Burnable,
             operator_burn_mode: false,
-            installer: Entity::Account([0;32]),
+            installer: Entity::Account([0; 32]),
             events_mode: EventsMode::NoEvents,
             minted_tokens_count: 0,
-            store: Default::default()
+            store: Default::default(),
         };
 
         Self { state }
@@ -67,7 +77,7 @@ impl NFTContract {
         metadata_mutability: MetadataMutability,
         burn_mode: BurnMode,
         operator_burn_mode: bool,
-        events_mode: Option<EventsMode>
+        events_mode: Option<EventsMode>,
     ) -> NFTContract {
         let installer = host::get_caller();
         let events_mode = events_mode.unwrap_or(EventsMode::NoEvents);
@@ -97,12 +107,10 @@ impl NFTContract {
             minted_tokens_count,
             events_mode,
             installer,
-            store
+            store,
         };
 
-        Self {
-            state
-        }
+        Self { state }
     }
 
     pub fn set_variables(
@@ -112,8 +120,8 @@ impl NFTContract {
         package_operator_mode: Option<bool>,
         operator_burn_mode: Option<bool>,
         acl_whitelist: Option<Vec<Entity>>,
-        contract_whitelist: Option<Vec<Entity>>
-    ) -> Result<(), NFTCoreError>{
+        contract_whitelist: Option<Vec<Entity>>,
+    ) -> Result<(), NFTCoreError> {
         // Only the installing account can change the mutable variables.
         if self.state.installer != host::get_caller() {
             return Err(NFTCoreError::InvalidAccount);
@@ -151,15 +159,15 @@ impl NFTContract {
                     for key in new_acl_whitelist {
                         self.insert_acl_entry(key, true);
                     }
-                },
-                WhitelistMode::Locked => return Err(NFTCoreError::InvalidWhitelistMode)
+                }
+                WhitelistMode::Locked => return Err(NFTCoreError::InvalidWhitelistMode),
             }
         }
 
         match &self.state.events_mode {
             EventsMode::NoEvents => (),
             EventsMode::CEP47 => self.write_cep47_event(CEP47Event::VariablesSet),
-            EventsMode::CES => self.emit_ces_event(VariablesSet::new())
+            EventsMode::CES => self.emit_ces_event(VariablesSet::new()),
         }
 
         Ok(())
@@ -207,10 +215,10 @@ impl NFTContract {
             NFTIdentifierMode::Ordinal => TokenIdentifier::Ordinal(minted_tokens_count),
             NFTIdentifierMode::Hash => TokenIdentifier::Hash(match optional_token_hash {
                 Some(hash) => hash,
-                None => self.generate_hash(token_metadata.clone())
-            })
+                None => self.generate_hash(token_metadata.clone()),
+            }),
         };
-        
+
         // TODO: Add metadata validation support
         // let metadata_kinds: Vec<(NFTMetadataKind, bool)> = Vec::new();
         // for (metadata_kind, required) in metadata_kinds {
@@ -244,22 +252,22 @@ impl NFTContract {
         // Increment the count of owned tokens.
         let current_balance = self.get_token_balance(token_owner);
         self.set_token_balance(token_owner, current_balance + 1);
-        
+
         // Increment number_of_minted_tokens by one
         self.state.minted_tokens_count += 1;
 
         // Emit mint event
         match self.state.events_mode {
-            EventsMode::NoEvents => {},
+            EventsMode::NoEvents => {}
             EventsMode::CES => self.emit_ces_event(Mint::new(
                 Self::unwrap_entity(token_owner),
                 token_identifier.clone(),
-                token_metadata
+                token_metadata,
             )),
             EventsMode::CEP47 => self.write_cep47_event(CEP47Event::Mint {
                 recipient: Self::unwrap_entity(token_owner),
-                token_id: token_identifier.clone()
-            })
+                token_id: token_identifier.clone(),
+            }),
         }
 
         Ok(token_identifier)
@@ -275,7 +283,7 @@ impl NFTContract {
         let Some(token_owner) = self.read_token_owner(&token_identifier) else {
             return Err(NFTCoreError::MissingTokenOwner);
         };
-        
+
         // Check if caller is owner
         let is_owner = token_owner == caller;
 
@@ -296,7 +304,7 @@ impl NFTContract {
         // owns a burnt token. That's all. Similarly, we should probably also not change the
         // owned_tokens dictionary.
         if self.read_token_burned(&token_identifier) {
-            return Err(NFTCoreError::PreviouslyBurntToken)
+            return Err(NFTCoreError::PreviouslyBurntToken);
         }
 
         self.set_token_burned(token_identifier.clone());
@@ -308,48 +316,45 @@ impl NFTContract {
                 if balance > 0u64 {
                     balance - 1u64
                 } else {
-                    return Err(NFTCoreError::FatalTokenIdDuplication)
+                    return Err(NFTCoreError::FatalTokenIdDuplication);
                 }
-            },
+            }
         };
 
         self.set_token_balance(token_owner, updated_balance);
 
         // Emit Burn event
         match self.state.events_mode {
-            EventsMode::NoEvents => {},
+            EventsMode::NoEvents => {}
             EventsMode::CES => {
-                self.emit_ces_event(Burn::new(
-                    token_owner,
-                    token_identifier,
-                    caller
-                ))
-            },
-            EventsMode::CEP47 => {
-                self.write_cep47_event(CEP47Event::Burn {
-                    owner: token_owner,
-                    token_id: token_identifier,
-                    burner: caller
-                })
+                self.emit_ces_event(Burn::new(token_owner, token_identifier, caller))
             }
+            EventsMode::CEP47 => self.write_cep47_event(CEP47Event::Burn {
+                owner: token_owner,
+                token_id: token_identifier,
+                burner: caller,
+            }),
         };
 
         Ok(())
     }
 
-    pub fn approve(&mut self, operator: Option<Entity>, spender: Entity, token_identifier: TokenIdentifier) -> Result<(), NFTCoreError> {
+    pub fn approve(
+        &mut self,
+        operator: Option<Entity>,
+        spender: Entity,
+        token_identifier: TokenIdentifier,
+    ) -> Result<(), NFTCoreError> {
         // If we are in minter or assigned mode it makes no sense to approve an account. Hence we
         // revert.
-        if let OwnershipMode::Minter | OwnershipMode::Assigned =
-            self.state.ownership_mode
-        {
-            return Err(NFTCoreError::InvalidOwnershipMode)
+        if let OwnershipMode::Minter | OwnershipMode::Assigned = self.state.ownership_mode {
+            return Err(NFTCoreError::InvalidOwnershipMode);
         }
 
         let caller = host::get_caller();
 
         let number_of_minted_tokens = self.state.minted_tokens_count;
-    
+
         if let NFTIdentifierMode::Ordinal = self.state.identifier_mode {
             // Revert if token_id is out of bounds
             if let TokenIdentifier::Ordinal(index) = &token_identifier {
@@ -358,23 +363,23 @@ impl NFTContract {
                 }
             }
         }
-    
+
         let Some(owner) = self.read_token_owner(&token_identifier) else {
             return Err(NFTCoreError::MissingTokenOwner);
         };
-    
+
         // Revert if caller is not token owner nor operator.
         // Only the token owner or an operator can approve an account
         let is_owner = caller == owner;
         let is_operator = !is_owner && self.read_operator(owner, caller);
-    
+
         if !is_owner && !is_operator {
             return Err(NFTCoreError::InvalidTokenOwner);
         }
-    
+
         // We assume a burnt token cannot be approved
         if self.read_token_burned(&token_identifier) {
-            return Err(NFTCoreError::PreviouslyBurntToken)
+            return Err(NFTCoreError::PreviouslyBurntToken);
         }
 
         let spender = match operator {
@@ -382,16 +387,16 @@ impl NFTContract {
             // Deprecated in favor of spender
             Some(operator) => operator,
         };
-    
+
         // If token owner or operator tries to approve itself that's probably a mistake and we revert.
         if caller == spender {
             return Err(NFTCoreError::InvalidAccount);
         }
-        
+
         if let Err(e) = self.set_approved(&token_identifier, spender) {
             return Err(e);
         }
-    
+
         // Emit Approval event.
         let owner = Self::unwrap_entity(owner);
         let spender = Self::unwrap_entity(spender);
@@ -412,10 +417,8 @@ impl NFTContract {
     pub fn revoke(&mut self, token_identifier: TokenIdentifier) -> Result<(), NFTCoreError> {
         // If we are in minter or assigned mode it makes no sense to approve an account. Hence we
         // revert.
-        if let OwnershipMode::Minter | OwnershipMode::Assigned =
-            self.state.ownership_mode
-        {
-            return Err(NFTCoreError::InvalidOwnershipMode)
+        if let OwnershipMode::Minter | OwnershipMode::Assigned = self.state.ownership_mode {
+            return Err(NFTCoreError::InvalidOwnershipMode);
         }
 
         let caller = host::get_caller();
@@ -434,19 +437,19 @@ impl NFTContract {
         let Some(owner) = self.read_token_owner(&token_identifier) else {
             return Err(NFTCoreError::MissingTokenOwner);
         };
-    
+
         // Revert if caller is not token owner nor operator.
         // Only the token owner or an operator can approve an account
         let is_owner = caller == owner;
         let is_operator = !is_owner && self.read_operator(owner, caller);
-    
+
         if !is_owner && !is_operator {
             return Err(NFTCoreError::InvalidTokenOwner);
         }
-    
+
         // We assume a burnt token cannot be approved
         if self.read_token_burned(&token_identifier) {
-            return Err(NFTCoreError::PreviouslyBurntToken)
+            return Err(NFTCoreError::PreviouslyBurntToken);
         }
 
         if let Err(e) = self.clear_approved(&token_identifier) {
@@ -470,14 +473,12 @@ impl NFTContract {
     pub fn set_approval_for_all(
         &mut self,
         approve_all: bool,
-        operator: Entity
+        operator: Entity,
     ) -> Result<(), NFTCoreError> {
         // If we are in minter or assigned mode it makes no sense to approve an operator. Hence we
         // revert.
-        if let OwnershipMode::Minter | OwnershipMode::Assigned =
-            self.state.ownership_mode
-        {
-            return Err(NFTCoreError::InvalidOwnershipMode)
+        if let OwnershipMode::Minter | OwnershipMode::Assigned = self.state.ownership_mode {
+            return Err(NFTCoreError::InvalidOwnershipMode);
         }
 
         let caller = host::get_caller();
@@ -494,16 +495,20 @@ impl NFTContract {
         let operator = Self::unwrap_entity(operator);
         match self.state.events_mode {
             EventsMode::NoEvents => {}
-            EventsMode::CES => {
-                match approve_all {
-                    true => self.emit_ces_event(ApprovalForAll::new(caller, operator)),
-                    false => self.emit_ces_event(RevokedForAll::new(caller, operator))
-                }
-            }
+            EventsMode::CES => match approve_all {
+                true => self.emit_ces_event(ApprovalForAll::new(caller, operator)),
+                false => self.emit_ces_event(RevokedForAll::new(caller, operator)),
+            },
             EventsMode::CEP47 => {
                 self.write_cep47_event(match approve_all {
-                    true => CEP47Event::ApprovalForAll { owner: caller, operator },
-                    false => CEP47Event::RevokedForAll { owner: caller, operator },
+                    true => CEP47Event::ApprovalForAll {
+                        owner: caller,
+                        operator,
+                    },
+                    false => CEP47Event::RevokedForAll {
+                        owner: caller,
+                        operator,
+                    },
                 });
             }
         }
@@ -514,8 +519,8 @@ impl NFTContract {
     pub fn is_approved_for_all(
         &self,
         owner: Entity,
-        operator: Entity
-    ) -> Result<bool, NFTCoreError> {    
+        operator: Entity,
+    ) -> Result<bool, NFTCoreError> {
         let is_operator = self.caller_is_operator_for_owner(owner, operator);
         Ok(is_operator)
     }
@@ -523,13 +528,16 @@ impl NFTContract {
     // Transfers token from token owner to specified account. Transfer will go through if caller is
     // owner or an approved account or an operator. Transfer will fail if OwnershipMode is Minter or
     // Assigned.
-    pub fn transfer(&mut self, source_owner: Entity, target_owner: Entity, token_identifier: TokenIdentifier) -> Result<(), NFTCoreError> {
+    pub fn transfer(
+        &mut self,
+        source_owner: Entity,
+        target_owner: Entity,
+        token_identifier: TokenIdentifier,
+    ) -> Result<(), NFTCoreError> {
         // If we are in minter or assigned mode we are not allowed to transfer ownership of token, hence
         // we revert.
-        if let OwnershipMode::Minter | OwnershipMode::Assigned =
-            self.state.ownership_mode
-        {
-            return Err(NFTCoreError::InvalidOwnershipMode)
+        if let OwnershipMode::Minter | OwnershipMode::Assigned = self.state.ownership_mode {
+            return Err(NFTCoreError::InvalidOwnershipMode);
         }
 
         if self.read_token_burned(&token_identifier) {
@@ -586,10 +594,10 @@ impl NFTContract {
                         balance - 1u64
                     } else {
                         // This should never happen...
-                        return Err(NFTCoreError::FatalTokenIdDuplication)
-                    }
+                        return Err(NFTCoreError::FatalTokenIdDuplication);
+                    },
                 );
-            },
+            }
         }
 
         // Update the to_account balance
@@ -598,19 +606,23 @@ impl NFTContract {
         self.clear_approved(&token_identifier).ok();
 
         match self.state.events_mode {
-            EventsMode::NoEvents => {},
+            EventsMode::NoEvents => {}
             EventsMode::CEP47 => self.write_cep47_event(CEP47Event::Transfer {
                 sender: Self::unwrap_entity(source_owner),
                 recipient: Self::unwrap_entity(target_owner),
-                token_id: token_identifier
+                token_id: token_identifier,
             }),
             EventsMode::CES => {
-                let spender = if caller == owner { None } else { Some(Self::unwrap_entity(caller)) };
+                let spender = if caller == owner {
+                    None
+                } else {
+                    Some(Self::unwrap_entity(caller))
+                };
                 self.emit_ces_event(Transfer::new(
                     Self::unwrap_entity(owner),
                     spender,
                     Self::unwrap_entity(target_owner),
-                    token_identifier
+                    token_identifier,
                 ));
             }
         }
@@ -618,18 +630,12 @@ impl NFTContract {
         Ok(())
     }
 
-    pub fn balance_of(
-        &self,
-        owner: Entity,
-    ) -> Result<u64, NFTCoreError> {
+    pub fn balance_of(&self, owner: Entity) -> Result<u64, NFTCoreError> {
         let balance = self.get_token_balance(owner);
         Ok(balance)
     }
 
-    pub fn owner_of(
-        &self,
-        identifier: TokenIdentifier,
-    ) -> Result<Entity, NFTCoreError> {
+    pub fn owner_of(&self, identifier: TokenIdentifier) -> Result<Entity, NFTCoreError> {
         let number_of_minted_tokens = self.state.minted_tokens_count;
 
         // Revert if token_id is out of bounds
@@ -651,15 +657,11 @@ impl NFTContract {
     fn unwrap_entity(entity: Entity) -> Address {
         match entity {
             Entity::Account(address) => address,
-            Entity::Contract(address) => address
+            Entity::Contract(address) => address,
         }
     }
 
-    fn caller_is_operator_for_owner(
-        &self,
-        caller: Entity,
-        owner: Entity
-    ) -> bool {
+    fn caller_is_operator_for_owner(&self, caller: Entity, owner: Entity) -> bool {
         for entry in &self.state.store.operators {
             if entry.key == owner && entry.value == caller {
                 return true;
@@ -669,12 +671,7 @@ impl NFTContract {
         return false;
     }
 
-    fn set_operator_for_owner(
-        &mut self,
-        owner: Entity,
-        operator: Entity,
-        value: bool
-    ) {
+    fn set_operator_for_owner(&mut self, owner: Entity, operator: Entity, value: bool) {
         if value == false {
             self.state.store.operators.retain(|entry| {
                 let owned = entry.key == owner;
@@ -694,16 +691,13 @@ impl NFTContract {
             }
         }
 
-        self.state.store.operators.push(OperatorEntry { 
+        self.state.store.operators.push(OperatorEntry {
             key: owner,
-            value: operator
+            value: operator,
         });
     }
 
-    fn clear_approved(
-        &mut self,
-        token_identifier: &TokenIdentifier
-    ) -> Result<(), NFTCoreError> {
+    fn clear_approved(&mut self, token_identifier: &TokenIdentifier) -> Result<(), NFTCoreError> {
         if let Some(mut data) = self.state.store.data.get(token_identifier) {
             data.approved = None;
         }
@@ -713,7 +707,7 @@ impl NFTContract {
     fn set_approved(
         &mut self,
         token_identifier: &TokenIdentifier,
-        entity: Entity
+        entity: Entity,
     ) -> Result<(), NFTCoreError> {
         if let Some(mut data) = self.state.store.data.get(token_identifier) {
             data.approved = Some(entity);
@@ -726,7 +720,7 @@ impl NFTContract {
 
     fn get_approved(
         &mut self,
-        token_identifier: &TokenIdentifier
+        token_identifier: &TokenIdentifier,
     ) -> Result<Option<Entity>, NFTCoreError> {
         if let Some(data) = self.state.store.data.get(token_identifier) {
             Ok(data.approved)
@@ -735,11 +729,7 @@ impl NFTContract {
         }
     }
 
-    fn set_token_balance(
-        &mut self,
-        owner: Entity,
-        count: u64
-    ) {
+    fn set_token_balance(&mut self, owner: Entity, count: u64) {
         let mut data = self.state.store.entity_data.get(&owner).unwrap_or_default();
         data.balance = count;
         self.state.store.entity_data.insert(&owner, &data);
@@ -776,7 +766,7 @@ impl NFTContract {
 
     fn insert_hash_id_lookups(
         &mut self,
-        token_identifier: &TokenIdentifier
+        token_identifier: &TokenIdentifier,
     ) -> Result<(), NFTCoreError> {
         let TokenIdentifier::Hash(hash) = token_identifier else {
             return Ok(());
@@ -786,29 +776,33 @@ impl NFTContract {
             return Err(NFTCoreError::DuplicateIdentifier);
         }
 
-        if self.state.store.hash_by_index.get(&self.state.minted_tokens_count).is_some() {
+        if self
+            .state
+            .store
+            .hash_by_index
+            .get(&self.state.minted_tokens_count)
+            .is_some()
+        {
             return Err(NFTCoreError::DuplicateIdentifier);
         }
 
-        self.state.store.hash_by_index.insert(&self.state.minted_tokens_count, hash);
-        self.state.store.index_by_hash.insert(hash, &self.state.minted_tokens_count);
+        self.state
+            .store
+            .hash_by_index
+            .insert(&self.state.minted_tokens_count, hash);
+        self.state
+            .store
+            .index_by_hash
+            .insert(hash, &self.state.minted_tokens_count);
 
         Ok(())
     }
 
-    fn insert_metadata(
-        &mut self,
-        identifier: &TokenIdentifier,
-        metadata: &String
-    ) {
+    fn insert_metadata(&mut self, identifier: &TokenIdentifier, metadata: &String) {
         self.state.store.metadata.insert(identifier, metadata);
     }
 
-    fn insert_token_issuer(
-        &mut self,
-        token_identifier: &TokenIdentifier,
-        issuer: Entity
-    ) {
+    fn insert_token_issuer(&mut self, token_identifier: &TokenIdentifier, issuer: Entity) {
         if let Some(mut data) = self.state.store.data.get(&token_identifier) {
             data.issuer = Some(issuer);
         } else {
@@ -818,10 +812,7 @@ impl NFTContract {
         }
     }
 
-    fn read_token_owner(
-        &self,
-        token_identifier: &TokenIdentifier
-    ) -> Option<Entity> {
+    fn read_token_owner(&self, token_identifier: &TokenIdentifier) -> Option<Entity> {
         if let Some(data) = self.state.store.data.get(&token_identifier) {
             data.owner
         } else {
@@ -829,11 +820,7 @@ impl NFTContract {
         }
     }
 
-    fn insert_token_owner(
-        &mut self,
-        token_identifier: &TokenIdentifier,
-        owner: Entity
-    ) {
+    fn insert_token_owner(&mut self, token_identifier: &TokenIdentifier, owner: Entity) {
         if let Some(mut data) = self.state.store.data.get(&token_identifier) {
             data.owner = Some(owner);
         } else {
@@ -846,7 +833,7 @@ impl NFTContract {
     fn validate_metadata(
         &self,
         kind: NFTMetadataKind,
-        metadata: String
+        metadata: String,
     ) -> Result<String, NFTCoreError> {
         let token_schema = self.get_metadata_schema(&kind);
         match &kind {
@@ -856,17 +843,17 @@ impl NFTContract {
 
                 if let Some(name_property) = token_schema.properties.get("name") {
                     if name_property.required && metadata.name.is_empty() {
-                        return Err(NFTCoreError::InvalidCEP99Metadata)
+                        return Err(NFTCoreError::InvalidCEP99Metadata);
                     }
                 }
                 if let Some(token_uri_property) = token_schema.properties.get("token_uri") {
                     if token_uri_property.required && metadata.token_uri.is_empty() {
-                        return Err(NFTCoreError::InvalidCEP99Metadata)
+                        return Err(NFTCoreError::InvalidCEP99Metadata);
                     }
                 }
                 if let Some(checksum_property) = token_schema.properties.get("checksum") {
                     if checksum_property.required && metadata.checksum.is_empty() {
-                        return Err(NFTCoreError::InvalidCEP99Metadata)
+                        return Err(NFTCoreError::InvalidCEP99Metadata);
                     }
                 }
                 serde_json::to_string_pretty(&metadata)
@@ -878,17 +865,17 @@ impl NFTContract {
 
                 if let Some(name_property) = token_schema.properties.get("name") {
                     if name_property.required && metadata.name.is_empty() {
-                        return Err(NFTCoreError::InvalidNFT721Metadata)
+                        return Err(NFTCoreError::InvalidNFT721Metadata);
                     }
                 }
                 if let Some(token_uri_property) = token_schema.properties.get("token_uri") {
                     if token_uri_property.required && metadata.token_uri.is_empty() {
-                        return Err(NFTCoreError::InvalidNFT721Metadata)
+                        return Err(NFTCoreError::InvalidNFT721Metadata);
                     }
                 }
                 if let Some(symbol_property) = token_schema.properties.get("symbol") {
                     if symbol_property.required && metadata.symbol.is_empty() {
-                        return Err(NFTCoreError::InvalidNFT721Metadata)
+                        return Err(NFTCoreError::InvalidNFT721Metadata);
                     }
                 }
                 serde_json::to_string_pretty(&metadata)
@@ -902,9 +889,10 @@ impl NFTContract {
                         .map_err(|_| NFTCoreError::FailedToParseCustomMetadata)?;
 
                 for (property_name, property_type) in token_schema.properties.iter() {
-                    if property_type.required && custom_metadata.attributes.get(property_name).is_none()
+                    if property_type.required
+                        && custom_metadata.attributes.get(property_name).is_none()
                     {
-                        return Err(NFTCoreError::InvalidCustomMetadata)
+                        return Err(NFTCoreError::InvalidCustomMetadata);
                     }
                 }
                 serde_json::to_string_pretty(&custom_metadata.attributes)
@@ -976,7 +964,7 @@ impl NFTContract {
             }
             NFTMetadataKind::CustomValidated => {
                 let custom_schema_json = self.state.store.json_schema.as_ref().unwrap();
-    
+
                 serde_json_wasm::from_str::<CustomMetadataSchema>(custom_schema_json)
                     .map_err(|_| NFTCoreError::InvalidJsonSchema)
                     .unwrap_or_revert()
@@ -1003,9 +991,7 @@ impl NFTContract {
     }
 
     // TODO: implement events
-    fn write_cep47_event(&mut self, _event: CEP47Event) {
-    }
+    fn write_cep47_event(&mut self, _event: CEP47Event) {}
 
-    fn emit_ces_event(&mut self, _event: impl Event) {
-    }
+    fn emit_ces_event(&mut self, _event: impl Event) {}
 }
