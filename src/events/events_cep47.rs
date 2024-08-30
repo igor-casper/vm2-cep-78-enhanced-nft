@@ -1,8 +1,8 @@
 use borsh::{BorshDeserialize, BorshSerialize};
-use casper_macros::{casper, CasperABI};
+use casper_macros::CasperABI;
 use casper_sdk::{host::Entity, types::Address};
 
-use crate::{error::NFTCoreError, types::TokenIdentifier};
+use crate::types::TokenIdentifier;
 
 #[derive(BorshSerialize, BorshDeserialize, CasperABI, Debug, Clone, PartialEq)]
 #[borsh(use_discriminant=true)]

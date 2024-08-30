@@ -203,7 +203,6 @@ impl NFTContract {
             }
         }
 
-        let metadata_kinds: Vec<(NFTMetadataKind, bool)> = Vec::new(); // TODO: support this modality!
         let token_identifier = match self.state.identifier_mode {
             NFTIdentifierMode::Ordinal => TokenIdentifier::Ordinal(minted_tokens_count),
             NFTIdentifierMode::Hash => TokenIdentifier::Hash(match optional_token_hash {
@@ -211,22 +210,24 @@ impl NFTContract {
                 None => self.generate_hash(token_metadata.clone())
             })
         };
-
-        for (metadata_kind, required) in metadata_kinds {
-            if !required {
-                continue;
-            }
-            let token_metadata_validation = self.validate_metadata(metadata_kind, token_metadata.clone());
-            match token_metadata_validation {
-                Ok(validated_token_metadata) => self.insert_metadata(
-                    &token_identifier,
-                    &validated_token_metadata
-                ),
-                Err(err) => {
-                    return Err(err);
-                }
-            }
-        }
+        
+        // TODO: Add metadata validation support
+        // let metadata_kinds: Vec<(NFTMetadataKind, bool)> = Vec::new();
+        // for (metadata_kind, required) in metadata_kinds {
+        //     if !required {
+        //         continue;
+        //     }
+        //     let token_metadata_validation = self.validate_metadata(metadata_kind, token_metadata.clone());
+        //     match token_metadata_validation {
+        //         Ok(validated_token_metadata) => self.insert_metadata(
+        //             &token_identifier,
+        //             &validated_token_metadata
+        //         ),
+        //         Err(err) => {
+        //             return Err(err);
+        //         }
+        //     }
+        // }
 
         // The contract's ownership behavior (determined at installation) determines,
         // who owns the NFT we are about to mint.()
@@ -567,17 +568,7 @@ impl NFTContract {
             return Err(NFTCoreError::InvalidTokenOwner);
         }
 
-        // TODO: Impl token hash migration
-        // let identifier_mode = self.state.identifier_mode.clone();
-        // if NFTIdentifierMode::Hash == identifier_mode && runtime::get_key(OWNED_TOKENS).is_some() {
-        //     if utils::should_migrate_token_hashes(source_owner_key) {
-        //         utils::migrate_token_hashes(source_owner_key)
-        //     }
-
-        //     if utils::should_migrate_token_hashes(target_owner_key) {
-        //         utils::migrate_token_hashes(target_owner_key)
-        //     }
-        // }
+        // TODO: Add hash migration with ORLM
 
         if self.read_token_owner(&token_identifier) != Some(source_owner) {
             return Err(NFTCoreError::InvalidTokenOwner);
