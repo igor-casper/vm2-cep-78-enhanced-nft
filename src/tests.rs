@@ -58,5 +58,5 @@ fn should_transfer_token() {
         assert_eq!(contract.balance_of(installer).unwrap(), 0);
         assert_eq!(contract.balance_of(recipient).unwrap(), 1);
     });
-    assert_eq!(result, Ok(()));
+    assert!(result.is_ok());
 }
