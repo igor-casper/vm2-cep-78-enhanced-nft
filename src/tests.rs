@@ -1,4 +1,4 @@
-use casper_sdk::host::{
+use casper_sdk::casper::{
     self,
     native::{Environment, DEFAULT_ADDRESS},
     Entity,
@@ -15,8 +15,8 @@ use crate::{
 #[test]
 fn should_transfer_token() {
     let stub = Environment::new(Default::default(), DEFAULT_ADDRESS);
-    let result = host::native::dispatch_with(stub, || {
-        let installer = host::get_caller();
+    let result = casper::native::dispatch_with(stub, || {
+        let installer = casper::get_caller();
         let recipient = Entity::Account([1; 32]);
 
         let mut contract = NFTContract::new(

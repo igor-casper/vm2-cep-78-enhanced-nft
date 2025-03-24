@@ -8,14 +8,14 @@ edition = "2021"
 crate-type = ["lib", "cdylib"]
 
 [dependencies]
-casper-macros = { git = "https://github.com/casper-network/casper-node.git", tag = "v2.0.0-rc5" }
-casper-sdk = { git = "https://github.com/casper-network/casper-node.git", tag = "v2.0.0-rc5" }
+casper-macros = { git = "https://github.com/casper-network/casper-node.git", branch = "release-2.0.0-rc9" }
+casper-sdk = { git = "https://github.com/casper-network/casper-node.git", branch = "release-2.0.0-rc9" }
 borsh = { version = "1.2.0", features = ["derive", "unstable__schema"] }
 base16 = { version = "0.2.1", default-features = false, features = ["alloc"] }
-serde = { version = "1.0.80", default-features = false }
-serde_json = { version = "1.0.59", default-features = false }
+serde = { version = "1.0", default-features = false }
+serde_json = { version = "1.0.140", default-features = false }
 serde-json-wasm = { version = "0.5.1", default-features = false }
-blake2b_simd = { version = "1.0.2", default-features = false }
+blake2b_simd = { version = "1.0.3", default-features = false }
 
 [profile.release]
 codegen-units = 1

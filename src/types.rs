@@ -2,7 +2,7 @@ use std::collections::BTreeMap;
 
 use borsh::{BorshDeserialize, BorshSerialize};
 use casper_macros::CasperABI;
-use casper_sdk::{collections::Map, host::Entity, types::Address};
+use casper_sdk::{collections::Map, casper::Entity, types::Address};
 use serde::{Deserialize, Serialize};
 
 // Metadata mutability is different from schema mutability.

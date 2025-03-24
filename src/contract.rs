@@ -14,7 +14,7 @@ use crate::{
 use blake2b_simd::blake2b;
 use casper_macros::*;
 use casper_sdk::*;
-use host::Entity;
+use casper::Entity;
 use types::*;
 
 #[casper(contract_state)]
@@ -79,7 +79,7 @@ impl NFTContract {
         operator_burn_mode: bool,
         events_mode: Option<EventsMode>,
     ) -> NFTContract {
-        let installer = host::get_caller();
+        let installer = casper::get_caller();
         let events_mode = events_mode.unwrap_or(EventsMode::NoEvents);
         let minted_tokens_count = 0u64;
         let store = StateStore::default();
@@ -123,7 +123,7 @@ impl NFTContract {
         contract_whitelist: Option<Vec<Entity>>,
     ) -> Result<(), NFTCoreError> {
         // Only the installing account can change the mutable variables.
-        if self.state.installer != host::get_caller() {
+        if self.state.installer != casper::get_caller() {
             return Err(NFTCoreError::InvalidAccount);
         }
 
@@ -195,7 +195,7 @@ impl NFTContract {
             return Err(NFTCoreError::TokenSupplyDepleted);
         }
 
-        let caller = host::get_caller();
+        let caller = casper::get_caller();
 
         // Revert if minting is private and caller is not installer.
         if MintingMode::Installer == self.state.minting_mode {
@@ -279,7 +279,7 @@ impl NFTContract {
             return Err(NFTCoreError::InvalidBurnMode);
         }
 
-        let caller = host::get_caller();
+        let caller = casper::get_caller();
         let Some(token_owner) = self.read_token_owner(&token_identifier) else {
             return Err(NFTCoreError::MissingTokenOwner);
         };
@@ -351,7 +351,7 @@ impl NFTContract {
             return Err(NFTCoreError::InvalidOwnershipMode);
         }
 
-        let caller = host::get_caller();
+        let caller = casper::get_caller();
 
         let number_of_minted_tokens = self.state.minted_tokens_count;
 
@@ -421,7 +421,7 @@ impl NFTContract {
             return Err(NFTCoreError::InvalidOwnershipMode);
         }
 
-        let caller = host::get_caller();
+        let caller = casper::get_caller();
 
         let number_of_minted_tokens = self.state.minted_tokens_count;
 
@@ -481,7 +481,7 @@ impl NFTContract {
             return Err(NFTCoreError::InvalidOwnershipMode);
         }
 
-        let caller = host::get_caller();
+        let caller = casper::get_caller();
 
         // If caller tries to approve itself as operator that's probably a mistake and we revert.
         if caller == operator {
@@ -552,7 +552,7 @@ impl NFTContract {
             return Err(NFTCoreError::InvalidAccount);
         }
 
-        let caller = host::get_caller();
+        let caller = casper::get_caller();
 
         // Check if caller is owner
         let is_owner = owner == caller;

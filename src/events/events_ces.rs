@@ -1,4 +1,4 @@
-use casper_sdk::{host::Entity, types::Address};
+use casper_sdk::{casper::Entity, types::Address};
 
 use crate::types::TokenIdentifier;
 
